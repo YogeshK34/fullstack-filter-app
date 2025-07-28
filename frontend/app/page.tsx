@@ -4,14 +4,13 @@ import { useEffect, useState } from 'react';
 import {
   Dialog,
   DialogContent,
-  DialogTrigger,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 type Student = {
   id: number;
@@ -28,8 +27,7 @@ type Student = {
 
 export default function HomePage() {
   const [students, setStudents] = useState<Student[]>([]);
-  const [editing, setEditing] = useState<Student | null>(null);
-  const [form, setForm] = useState<Omit<Student, 'id' | 'created_at'>>({
+  const [newStudent, setNewStudent] = useState<Omit<Student, 'id' | 'created_at'>>({
     name: '',
     email: '',
     branch: '',
@@ -39,32 +37,31 @@ export default function HomePage() {
     year: 1,
     gender: '',
   });
+  const [editing, setEditing] = useState<Student | null>(null);
 
-  // Fetch students
-  const fetchStudents = () => {
-    fetch('http://localhost:8080/')
-      .then((res) => res.json())
-      .then((data) => setStudents(data))
-      .catch((err) => console.error('Failed to fetch:', err));
+  const [searchName, setSearchName] = useState('');
+  const [filterBranch, setFilterBranch] = useState('');
+  const [filterYear, setFilterYear] = useState('');
+
+  const fetchStudents = async () => {
+    const res = await fetch('http://localhost:8080/');
+    const data = await res.json();
+    setStudents(data);
   };
 
   useEffect(() => {
     fetchStudents();
   }, []);
 
-  // Create new student
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const res = await fetch('http://localhost:8080/students', {
+  const handleCreate = async () => {
+    const res = await fetch('http://localhost:8080/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify(newStudent),
     });
 
     if (res.ok) {
-      alert('Student created!');
-      setForm({
+      setNewStudent({
         name: '',
         email: '',
         branch: '',
@@ -75,179 +72,140 @@ export default function HomePage() {
         gender: '',
       });
       fetchStudents();
-    } else {
-      alert('Failed to create student');
     }
   };
 
-  // Delete a student
   const handleDelete = async (id: number) => {
-    const res = await fetch(`http://localhost:8080/delete/${id}`, {
+    await fetch(`http://localhost:8080/deleteuser/${id}`, {
       method: 'DELETE',
     });
-
-    if (res.ok) {
-      alert('Deleted');
-      fetchStudents();
-    } else {
-      alert('Delete failed');
-    }
+    fetchStudents();
   };
 
   const handleUpdate = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (!editing) return;
+    e.preventDefault();
+    if (!editing) return;
 
-  const { id, created_at, ...dataToUpdate } = editing;
+    const { id, created_at, ...updateData } = editing;
 
-  const res = await fetch(`http://localhost:8080/updateuser/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(dataToUpdate),
-  });
+    const res = await fetch(`http://localhost:8080/updateuser/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updateData),
+    });
 
-  if (res.ok) {
-    alert('Student updated!');
-    setEditing(null);
-    fetchStudents();
-  } else {
-    alert('Update failed');
-  }
-};
-
-
-  // Handle form change
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({
-      ...prev,
-      [name]: name === 'floor' || name === 'year' ? parseInt(value) : value,
-    }));
+    if (res.ok) {
+      setEditing(null);
+      fetchStudents();
+    }
   };
 
+  const filteredStudents = students.filter((student) => {
+    const matchesName = student.name.toLowerCase().includes(searchName.toLowerCase());
+    const matchesBranch = filterBranch ? student.branch === filterBranch : true;
+    const matchesYear = filterYear ? student.year.toString() === filterYear : true;
+    return matchesName && matchesBranch && matchesYear;
+  });
+
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Students</h1>
+    <div className="p-6 space-y-6">
+      <h1 className="text-2xl font-bold">Student Dashboard</h1>
 
-      {/* Create Student Form */}
-      <form onSubmit={handleCreate} className="space-y-2 mb-6">
-        <input name="name" placeholder="Name" value={form.name} onChange={handleChange} className="block border p-1 w-full" />
-        <input name="email" placeholder="Email" value={form.email} onChange={handleChange} className="block border p-1 w-full" />
-        <input name="branch" placeholder="Branch" value={form.branch} onChange={handleChange} className="block border p-1 w-full" />
-        <input name="building" placeholder="Building" value={form.building} onChange={handleChange} className="block border p-1 w-full" />
-        <input name="floor" type="number" placeholder="Floor" value={form.floor} onChange={handleChange} className="block border p-1 w-full" />
-        <input name="room_number" placeholder="Room Number" value={form.room_number} onChange={handleChange} className="block border p-1 w-full" />
-        <input name="year" type="number" placeholder="Year" value={form.year} onChange={handleChange} className="block border p-1 w-full" />
-        <select name="gender" value={form.gender} onChange={handleChange} className="block border p-1 w-full">
-          <option value="">Select Gender</option>
-          <option value="Male">Male</option>
-          <option value="Female">Female</option>
-        </select>
-        <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded">
-          Create Student
-        </button>
-      </form>
+      {/* Create Form */}
+      <div className="space-y-2">
+        <h2 className="text-xl font-semibold">Create Student</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Input placeholder="Name" value={newStudent.name} onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })} />
+          <Input placeholder="Email" value={newStudent.email} onChange={(e) => setNewStudent({ ...newStudent, email: e.target.value })} />
+          <Input placeholder="Branch" value={newStudent.branch} onChange={(e) => setNewStudent({ ...newStudent, branch: e.target.value })} />
+          <Input placeholder="Building" value={newStudent.building} onChange={(e) => setNewStudent({ ...newStudent, building: e.target.value })} />
+          <Input placeholder="Floor" type="number" value={newStudent.floor} onChange={(e) => setNewStudent({ ...newStudent, floor: parseInt(e.target.value) })} />
+          <Input placeholder="Room #" value={newStudent.room_number} onChange={(e) => setNewStudent({ ...newStudent, room_number: e.target.value })} />
+          <Input placeholder="Year" type="number" value={newStudent.year} onChange={(e) => setNewStudent({ ...newStudent, year: parseInt(e.target.value) })} />
+          <Input placeholder="Gender" value={newStudent.gender} onChange={(e) => setNewStudent({ ...newStudent, gender: e.target.value })} />
+        </div>
+        <Button onClick={handleCreate}>Create</Button>
+      </div>
 
-      <Dialog open={!!editing} onOpenChange={() => setEditing(null)}>
-  <DialogContent>
-    <form onSubmit={handleUpdate} className="space-y-4">
-      <DialogHeader>
-        <DialogTitle>Edit Student</DialogTitle>
-      </DialogHeader>
+      {/* Filters */}
+      <div className="flex flex-col md:flex-row gap-4">
+        <div className="space-y-1 flex-1">
+          <Label>Name</Label>
+          <Input placeholder="Search by name" value={searchName} onChange={(e) => setSearchName(e.target.value)} />
+        </div>
+        <div className="space-y-1 flex-1">
+          <Label>Branch</Label>
+          <select className="w-full border px-2 py-1 rounded" value={filterBranch} onChange={(e) => setFilterBranch(e.target.value)}>
+            <option value="">All</option>
+            <option value="Msc DataScience">Msc DataScience</option>
+            <option value="Msc Blockchain">Msc Blockchain</option>
+            <option value="MCA">MCA</option>
+          </select>
+        </div>
+        <div className="space-y-1 flex-1">
+          <Label>Year</Label>
+          <select className="w-full border px-2 py-1 rounded" value={filterYear} onChange={(e) => setFilterYear(e.target.value)}>
+            <option value="">All</option>
+            <option value="1">1st</option>
+            <option value="2">2nd</option>
+            <option value="3">3rd</option>
+            <option value="4">4th</option>
+          </select>
+        </div>
+      </div>
 
-      {editing && (
-        <>
-          <div className="space-y-2">
-            <Label>Name</Label>
-            <Input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
-          </div>
-          <div className="space-y-2">
-            <Label>Email</Label>
-            <Input value={editing.email} onChange={(e) => setEditing({ ...editing, email: e.target.value })} />
-          </div>
-          <div className="space-y-2">
-            <Label>Branch</Label>
-            <Input value={editing.branch} onChange={(e) => setEditing({ ...editing, branch: e.target.value })} />
-          </div>
-          <div className="space-y-2">
-            <Label>Building</Label>
-            <Input value={editing.building} onChange={(e) => setEditing({ ...editing, building: e.target.value })} />
-          </div>
-          <div className="space-y-2">
-            <Label>Floor</Label>
-            <Input
-              type="number"
-              value={editing.floor}
-              onChange={(e) => setEditing({ ...editing, floor: parseInt(e.target.value) })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Room Number</Label>
-            <Input value={editing.room_number} onChange={(e) => setEditing({ ...editing, room_number: e.target.value })} />
-          </div>
-          <div className="space-y-2">
-            <Label>Year</Label>
-            <Input
-              type="number"
-              value={editing.year}
-              onChange={(e) => setEditing({ ...editing, year: parseInt(e.target.value) })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Gender</Label>
-            <Input value={editing.gender} onChange={(e) => setEditing({ ...editing, gender: e.target.value })} />
-          </div>
-        </>
-      )}
-
-      <DialogFooter>
-        <Button type="submit">Save Changes</Button>
-      </DialogFooter>
-    </form>
-  </DialogContent>
-</Dialog>
-
-
-      {/* Students Table */}
-      <table className="w-full table-auto border">
-        <thead className="bg-gray-100">
-          <tr>
-            <th className="border px-2 py-1">Name</th>
-            <th className="border px-2 py-1">Email</th>
-            <th className="border px-2 py-1">Branch</th>
-            <th className="border px-2 py-1">Building</th>
-            <th className="border px-2 py-1">Floor</th>
-            <th className="border px-2 py-1">Room</th>
-            <th className="border px-2 py-1">Year</th>
-            <th className="border px-2 py-1">Gender</th>
-            <th className="border px-2 py-1">Created</th>
-            <th className="border px-2 py-1">Actions</th>
+      {/* Table */}
+      <table className="w-full border mt-4">
+        <thead>
+          <tr className="bg-gray-100">
+            <th className="p-2 border">Name</th>
+            <th className="p-2 border">Email</th>
+            <th className="p-2 border">Branch</th>
+            <th className="p-2 border">Actions</th>
           </tr>
         </thead>
         <tbody>
-          {students.map((s) => (
+          {filteredStudents.map((s) => (
             <tr key={s.id}>
-              <td className="border px-2 py-1">{s.name}</td>
-              <td className="border px-2 py-1">{s.email}</td>
-              <td className="border px-2 py-1">{s.branch}</td>
-              <td className="border px-2 py-1">{s.building}</td>
-              <td className="border px-2 py-1">{s.floor}</td>
-              <td className="border px-2 py-1">{s.room_number}</td>
-              <td className="border px-2 py-1">{s.year}</td>
-              <td className="border px-2 py-1">{s.gender}</td>
-              <td className="border px-2 py-1">{new Date(s.created_at).toLocaleString()}</td>
-              <td className="border px-2 py-1">
-                <button
-                  onClick={() => handleDelete(s.id)}
-                  className="text-red-600 underline"
-                >
-                  Delete
-                </button>
+              <td className="p-2 border">{s.name}</td>
+              <td className="p-2 border">{s.email}</td>
+              <td className="p-2 border">{s.branch}</td>
+              <td className="p-2 border space-x-2">
+                <Button variant="outline" onClick={() => setEditing(s)}>Edit</Button>
+                <Button variant="destructive" onClick={() => handleDelete(s.id)}>Delete</Button>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editing} onOpenChange={() => setEditing(null)}>
+        <DialogContent>
+          <form onSubmit={handleUpdate} className="space-y-4">
+            <DialogHeader>
+              <DialogTitle>Edit Student</DialogTitle>
+            </DialogHeader>
+
+            {editing && (
+              <>
+                <Input placeholder="Name" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
+                <Input placeholder="Email" value={editing.email} onChange={(e) => setEditing({ ...editing, email: e.target.value })} />
+                <Input placeholder="Branch" value={editing.branch} onChange={(e) => setEditing({ ...editing, branch: e.target.value })} />
+                <Input placeholder="Building" value={editing.building} onChange={(e) => setEditing({ ...editing, building: e.target.value })} />
+                <Input placeholder="Floor" type="number" value={editing.floor} onChange={(e) => setEditing({ ...editing, floor: parseInt(e.target.value) })} />
+                <Input placeholder="Room #" value={editing.room_number} onChange={(e) => setEditing({ ...editing, room_number: e.target.value })} />
+                <Input placeholder="Year" type="number" value={editing.year} onChange={(e) => setEditing({ ...editing, year: parseInt(e.target.value) })} />
+                <Input placeholder="Gender" value={editing.gender} onChange={(e) => setEditing({ ...editing, gender: e.target.value })} />
+              </>
+            )}
+
+            <DialogFooter>
+              <Button type="submit">Save Changes</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
